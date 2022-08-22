@@ -6,6 +6,7 @@ from tiles import Tile, StaticTile, Crate, Coin, Palm
 from player import Player
 from enemy import Enemy
 from decoration import Sky, Water, Clouds
+from particles import ParticleEffect
 
 class Level:
     def __init__(self, win, level_data):
@@ -18,6 +19,7 @@ class Level:
         self.player = pygame.sprite.GroupSingle()
         self.goal = pygame.sprite.GroupSingle()
         self.player_setup(player_layout)
+        self.current_x = 0
 
         # terrain setup
         terrain_layout = import_csv_layout(level_data['terrain'])
@@ -56,6 +58,10 @@ class Level:
         self.water = Water(HEIGHT - 25)
         self.clouds = Clouds(400, 20)
 
+        # dust particles
+        self.dust_sprite = pygame.sprite.GroupSingle()
+        self.player_on_ground = False
+
     def player_setup(self, layout):
 
         for row_index, row in enumerate(layout):
@@ -63,7 +69,7 @@ class Level:
                 x = col_index * TILESIZE
                 y = row_index * TILESIZE
                 if val == '0':
-                    sprite = Player((x, y))
+                    sprite = Player((x, y), self.win, self.create_jump_particles_func)
                     self.player.add(sprite)
                 if val == '1':
                     hat_surf = pygame.image.load('graphics/character/hat.png').convert_alpha()
@@ -119,6 +125,29 @@ class Level:
             if pygame.sprite.spritecollide(enemy, self.constraint_sprites, False):
                 enemy.reverse()
 
+    def create_jump_particles_func(self, pos):
+        if self.player.sprite.facing_right:
+            pos -= pygame.math.Vector2(10,5)
+        else:
+            pos += pygame.math.Vector2(10,-5)
+        jump_particle_sprite = ParticleEffect(pos,'jump')
+        self.dust_sprite.add(jump_particle_sprite)
+
+    def create_landing_particles(self):
+        if not self.player_on_ground and self.player.sprite.on_ground and not self.dust_sprite.sprites():
+            if self.player.sprite.facing_right:
+                offset = pygame.math.Vector2(10,15)
+            else:
+                offset = pygame.math.Vector2(-10,15)
+            fall_dust_particle = ParticleEffect(self.player.sprite.rect.midbottom - offset,'land')
+            self.dust_sprite.add(fall_dust_particle)
+
+    def get_player_on_ground(self):
+        if self.player.sprite.on_ground:
+            self.player_on_ground = True
+        else:
+            self.player_on_ground = False
+
     def autoscroll(self):
         player = self.player.sprite
         player_x = player.rect.centerx
@@ -139,28 +168,44 @@ class Level:
         player = self.player.sprite
         player.rect.x += player.direction.x * player.speed
 
-        for sprite in obstacle_groups:
-            if sprite.rect.colliderect(player.rect):
-                if player.direction.x > 0:
-                    player.rect.right = sprite.rect.left
-                elif player.direction.x < 0:
-                    player.rect.left = sprite.rect.right
+        for sprite_list in obstacle_groups:
+            for sprite in sprite_list:
+                if sprite.rect.colliderect(player.rect):
+                    if player.direction.x > 0:
+                        player.rect.right = sprite.rect.left
+                        player.on_right = True
+                        self.current_x = player.rect.right
+                    elif player.direction.x < 0:
+                        player.rect.left = sprite.rect.right
+                        player.on_left = True
+                        self.current_x = player.rect.left
+
+        if player.on_left and (player.rect.left < self.current_x or player.direction.x >= 0):
+            player.on_left = False
+        if player.on_right and (player.rect.right > self.current_x or player.direction.x <= 0):
+            player.on_right = False    
 
     def handle_vertical_collision(self, obstacle_groups):
 
         player = self.player.sprite
         player.apply_gravity()
 
-        for sprite in obstacle_groups:
-            if sprite.rect.colliderect(player.rect):
-                if player.direction.y > 0:
-                    player.rect.bottom = sprite.rect.top
-                    player.direction.y = 0  # cancel out gravity
-                    player.on_ground = True                
-                elif player.direction.y < 0:
-                    player.rect.top = sprite.rect.bottom
-                    player.direction.y = 0
-                    player.on_ceiling = True
+        for sprite_list in obstacle_groups:
+            for sprite in sprite_list:
+                if sprite.rect.colliderect(player.rect):
+                    if player.direction.y > 0:
+                        player.rect.bottom = sprite.rect.top
+                        player.direction.y = 0  # cancel out gravity
+                        player.on_ground = True                
+                    elif player.direction.y < 0:
+                        player.rect.top = sprite.rect.bottom
+                        player.direction.y = 0
+                        player.on_ceiling = True
+
+        if player.on_ground and player.direction.y < 0 or player.direction.y > 1:
+            player.on_ground = False
+        if player.on_ceiling and player.direction.y > 0.1:
+            player.on_ceiling = False
 
     # run the entire game/level
     def run(self):
@@ -178,9 +223,6 @@ class Level:
         # terrain
         self.terrain_sprites.update(self.world_shift)
         self.terrain_sprites.draw(self.win)
-
-        # water
-        self.water.draw(self.win, self.world_shift)
 
         # crates
         self.crate_sprites.update(self.world_shift)
@@ -200,15 +242,25 @@ class Level:
         self.fg_palm_sprites.update(self.world_shift)
         self.fg_palm_sprites.draw(self.win)
 
+        # dust
+        self.dust_sprite.update(self.world_shift)
+        self.dust_sprite.draw(self.win)
+
         # player sprites
         self.goal.update(self.world_shift)
         self.goal.draw(self.win)
+
         self.player.update()
-        self.handle_horizontal_collision(self.terrain_sprites)
-        self.handle_vertical_collision(self.terrain_sprites)
-        self.player.draw(self.win)
+        self.handle_horizontal_collision([self.terrain_sprites, self.fg_palm_sprites])
+        self.get_player_on_ground()
+        self.handle_vertical_collision([self.terrain_sprites, self.fg_palm_sprites])
+        self.create_landing_particles()
         self.autoscroll()
+        self.player.draw(self.win)
 
         # grass
         self.grass_sprites.update(self.world_shift)
         self.grass_sprites.draw(self.win)
+
+        # water
+        self.water.draw(self.win, self.world_shift)
