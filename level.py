@@ -155,9 +155,12 @@ class Level:
             if sprite.rect.colliderect(player.rect):
                 if player.direction.y > 0:
                     player.rect.bottom = sprite.rect.top
-                    player.direction.y = 0  # cancel out gravity                  
+                    player.direction.y = 0  # cancel out gravity
+                    player.on_ground = True                
                 elif player.direction.y < 0:
                     player.rect.top = sprite.rect.bottom
+                    player.direction.y = 0
+                    player.on_ceiling = True
 
     # run the entire game/level
     def run(self):
