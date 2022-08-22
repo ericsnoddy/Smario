@@ -148,6 +148,13 @@ class Level:
         else:
             self.player_on_ground = False
 
+    def handle_enemy_collision(self):
+        player = self.player.sprite
+
+        for sprite in self.enemy_sprites:
+            if sprite.rect.collidepoint(player.rect):
+                pass
+
     def autoscroll(self):
         player = self.player.sprite
         player_x = player.rect.centerx

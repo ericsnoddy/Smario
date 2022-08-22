@@ -91,8 +91,6 @@ class Player(pygame.sprite.Sprite):
             self.image = pygame.transform.flip(image, True, False)
 
         # get rectangles
-        offset_y = pygame.math.Vector2(0,-4)
-
         if self.on_ground and self.on_right:
             self.rect = self.image.get_rect(bottomright = self.rect.bottomright)
         elif self.on_ground and self.on_left:
