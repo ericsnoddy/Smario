@@ -16,8 +16,9 @@ while True:
             pygame.quit()
             sys.exit()
 
-    WIN.fill('black')
     level.run()
 
     pygame.display.update()
     clock.tick(FPS)
+
+
