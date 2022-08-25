@@ -31,7 +31,7 @@ class Water:
     def __init__(self, top):
         water_start = -WIDTH
         WATER_TILE_WIDTH = 192
-        EXTEND_TILES = 2
+        EXTEND_TILES = 8
         tiles = int((LWIDTH + WIDTH) / WATER_TILE_WIDTH) + EXTEND_TILES
         self.water_sprites = pygame.sprite.Group()
 
